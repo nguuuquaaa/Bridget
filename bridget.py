@@ -168,7 +168,7 @@ async def setavatar(ctx, *, avatar_url=None):
 
 @bridget.command()
 @commands.check(lambda ctx: ctx.author.id==247360205086654464)
-async def force(ctx, facebook_id, field, value):
+async def force(ctx, facebook_id, field, value=None):
     item = get_element(bridget.fb_users, lambda x: x["facebook_id"]==facebook_id, {})
     if field in item:
         item[field] = value
@@ -247,6 +247,8 @@ class BridgetFB:
         while not self.bot.listening:
             time.sleep(0.1)
         group_info = self.bot.fetchGroupInfo("1240696179284814")["1240696179284814"]
+        group_info.thread_id = group_info.uid
+        group_info.thread_type = group_info.type
         self.nicknames = group_info.nicknames
         self.users = self.bot.fetchUserInfo(*group_info.participants)
         while self._running:
@@ -256,9 +258,9 @@ class BridgetFB:
                 continue
             if author != self.last_author:
                 self.last_author = author
-                self.bot.send(models.Message(text=f"```\n(Discord) {author}\n```\n{content}"), "1240696179284814", models.ThreadType.GROUP)
+                self.bot.send_message(group_info, f"```\n(Discord) {author}\n```\n{content}")
             else:
-                self.bot.send(models.Message(text=content), "1240696179284814", models.ThreadType.GROUP)
+                self.bot.send_message(group_info, content)
 
 #==================================================================================================================================================
 
