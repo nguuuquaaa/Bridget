@@ -82,7 +82,7 @@ class BridgetDiscord(commands.Bot):
                 nickname = f"{nickname[:22]}..."
             avatar_url = user.get("avatar_url")
             if not avatar_url:
-                u = self.bot.get_user(user.get("discord_id"))
+                u = self.get_user(user.get("discord_id"))
                 if u:
                     avatar_url = u.avatar_url
             await wh.execute(content, username=f"(FB) {nickname}", avatar_url=avatar_url)
