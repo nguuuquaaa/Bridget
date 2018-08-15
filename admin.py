@@ -23,7 +23,7 @@ class Admin:
                         break
                 else:
                     return
-                if command.startswith(("eval ")):
+                if command.startswith(("eval")):
                     data = command[5:]
                     self.cmd_eval(message, data)
                 elif command.startswith(("updateprefix")):

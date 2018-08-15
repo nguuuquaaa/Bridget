@@ -7,12 +7,13 @@ import threading
 from motor import motor_asyncio
 from contextlib import redirect_stdout
 import traceback
-from io import StringIO
+from io import StringIO, BytesIO
 import time
 import queue
 import asyncio
 import weakref
 import credentials
+from PIL import Image
 
 _discord_format = re.compile("\<\:\w+:[0-9]{18}\>")
 _discord_to_fb = {"<:ahihi:301721953394229258>": ":)", "<:dm:301730374743097346>": "\U0001f621"}
@@ -65,6 +66,10 @@ class BridgetDiscord(commands.Bot):
         if not message.author.bot:
             await self.process_commands(message)
 
+    async def do_stuff_after(self, coro, after):
+        await asyncio.sleep(after)
+        await coro
+
     async def wait_for_fb_messages(self):
         self.fb_users = (await self.config.find_one({"category": "fb_users"}, projection={"_id": False, "category": False}))["data"]
         await self.wait_until_ready()
@@ -85,7 +90,13 @@ class BridgetDiscord(commands.Bot):
                 u = self.get_user(user.get("discord_id"))
                 if u:
                     avatar_url = u.avatar_url
-            await wh.execute(content, username=f"(FB) {nickname}", avatar_url=avatar_url)
+            try:
+                if isinstance(content, discord.File):
+                    await wh.execute(file=content, username=f"(FB) {nickname}", avatar_url=avatar_url)
+                else:
+                    await wh.execute(content, username=f"(FB) {nickname}", avatar_url=avatar_url)
+            except:
+                self.loop.create_task(self.do_stuff_after(wh.execute(content, username=f"(FB) {nickname}", avatar_url=avatar_url), 10))
 
     async def close(self):
         self.post_to_discord().cancel()
@@ -103,7 +114,7 @@ async def on_ready():
     print(bridget.user.id)
     print("------")
     await asyncio.sleep(1)
-    await bridget.change_presence(activity=discord.Game(name="\U0001f440"))
+    await bridget.change_presence(activity=discord.Activity(name="\U0001f440", type=discord.ActivityType.watching))
 
 @bridget.command(name="eval")
 @commands.check(lambda ctx: ctx.author.id==247360205086654464)
@@ -221,27 +232,62 @@ class BridgetFB:
                     nickname = author_id
 
             if raw_message.get("attachments"):
-                data_map = raw_message.get("genericDataMap")
-                if data_map:
-                    url = data_map["data"]["e"]["asMap"]["data"]["serializedFields"]["asMap"]["external_url"]["asString"]
-                    fb_messages.put((author_id, nickname, url))
-                else:
-                    for attachment in raw_message["attachments"]:
-                        a = attachment["mercury"].get("blob_attachment")
-                        if a:
-                            url = a.get("large_preview")["uri"]
-                            fb_messages.put((author_id, nickname, url))
+                try:
+                    data_map = raw_message.get("genericDataMap")
+                    if data_map:
+                        url = data_map["data"]["e"]["asMap"]["data"]["serializedFields"]["asMap"]["external_url"]["asString"]
+                        fb_messages.put((author_id, nickname, url))
+                    else:
+                        for attachment in raw_message["attachments"]:
+                            mercury = attachment["mercury"]
+                            if mercury.get("blob_attachment"):
+                                url = mercury["blob_attachment"]["large_preview"]["uri"]
+                                bytes_ = self.bot._session.get(url).content
+                                fb_messages.put((author_id, nickname, discord.File(bytes_, attachment["filename"])))
+                            elif mercury.get("sticker_attachment"):
+                                sticker = mercury["sticker_attachment"]
+
+                                raw_url = sticker["sprite_image_2x"]
+                                frame_count = sticker["frame_count"]
+                                if bool(raw_url) and frame_count > 1:
+                                    rows = sticker["frames_per_row"]
+                                    columns = sticker["frames_per_column"]
+                                    duration = sticker["frame_rate"]
+                                    bytes_ = self.bot._session.get(raw_url["uri"]).content
+                                    image = Image.open(BytesIO(bytes_)).convert("P")
+                                    img_width, img_height = image.size
+                                    width = img_width/columns
+                                    height = img_height/rows
+                                    frames = []
+
+                                    for y_count in range(rows):
+                                        y = y_count * height
+                                        for x_count in range(columns):
+                                            x = x_count * width
+                                            current = image.crop((x, y, x+width, y+height))
+                                            frames.append(current)
+
+                                    output = BytesIO()
+                                    frames[0].save(output, "gif", save_all=True, append_images=frames[1:], loop=0, duration=duration, transparency=255, disposal=2, optimize=False)
+
+                                    fb_messages.put((author_id, nickname, discord.File(output.getvalue(), f"sticker_{sticker['id']}.gif")))
+                                else:
+                                    bytes_ = self.bot._session.get(sticker["url"]).content
+                                    fb_messages.put((author_id, nickname, discord.File(bytes_, f"sticker_{sticker['id']}.png")))
+
+                except:
+                    traceback.print_exc()
 
     def on_nickname_change(self, action):
         self.nicknames[action.author_id] = action.after
 
     def on_users_add(self, action):
-        user = self.bot.fetchUserInfo(action.author_id)
-        self.users.update(user)
+        users = self.bot.fetchUserInfo(action.after)
+        self.users.update(users)
 
     def on_user_remove(self, action):
-        self.nicknames.pop(action.author_id, None)
-        self.users.pop(action.author_id, None)
+        self.nicknames.pop(action.after, None)
+        self.users.pop(action.after, None)
 
     def wait_for_discord_messages(self):
         while not self.bot.listening:

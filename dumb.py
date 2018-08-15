@@ -1,8 +1,7 @@
 import bot
-import credentials
 
 #==================================================================================================================================================
 
-bridget = bot.Bot(credentials.username, credentials.password, initial_extensions=["patch", "admin", "otogi", "bridget"])
+bridget = bot.Bot("nguuuno1@gmail.com", "core(tm)2duo", initial_extensions=["admin", "testcog"])
 if __name__ == "__main__":
     bridget.listen()

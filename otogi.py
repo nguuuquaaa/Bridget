@@ -172,9 +172,13 @@ class Otogi:
         except:
             return
         else:
-            pic_url, text_body = d.text_form()
-            for t in text_body:
-                message.reply(t)
+            try:
+                pic_url, text_body = d.text_form()
+            except:
+                message.reply(f"{d.name}'s info is incompleted.")
+            else:
+                for t in text_body:
+                    message.reply(t)
 
     def cmd_trivia(self, message, name):
         daemons = self.search(name)
@@ -201,9 +205,13 @@ class Otogi:
         except:
             return
         else:
-            pic_url, text_body = d.more_info()
-            for t in text_body:
-                message.reply(t)
+            try:
+                pic_url, text_body = d.more_info()
+            except:
+                message.reply(f"{d.name}'s info is incompleted.")
+            else:
+                for t in text_body:
+                    message.reply(t)
 
 #==================================================================================================================================================
 def setup(bot):
