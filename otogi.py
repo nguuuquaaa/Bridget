@@ -177,7 +177,7 @@ class Otogi:
                 await message.thread.send(f"{d.name}'s info is incompleted.")
             else:
                 if pic_url:
-                    await message.thread.send(flat.Content().embed(pic_url, append=False))
+                    await message.thread.send(flat.Content().embed_link(pic_url, append=False))
                 await message.thread.send(text_body)
 
     async def cmd_trivia(self, message, name):
@@ -211,7 +211,7 @@ class Otogi:
                 await message.thread.send(f"{d.name}'s info is incompleted.")
             else:
                 if pic_url:
-                    await message.thread.send(flat.Content().embed(pic_url, append=False))
+                    await message.thread.send(flat.Content().embed_link(pic_url, append=False))
                 await message.thread.send(text_body)
 
 #==================================================================================================================================================

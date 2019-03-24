@@ -41,6 +41,8 @@ def try_it(func):
     async def new_func(*args, **kwargs):
         try:
             return await func(*args, **kwargs)
+        except asyncio.CancelledError:
+            return
         except:
             traceback.print_exc()
 
@@ -60,7 +62,7 @@ class BridgetDiscord(commands.Bot):
 
 #==================================================================================================================================================
 
-class DoStuff:
+class DoStuff(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.post_to_discord = bot.loop.create_task(self.wait_for_fb_messages())
@@ -69,6 +71,7 @@ class DoStuff:
     def __unload(self):
         self.post_to_discord.cancel()
 
+    @commands.Cog.listener()
     async def on_ready(self):
         print("Logged in as")
         print(self.bot.user.name)
@@ -77,6 +80,7 @@ class DoStuff:
         await asyncio.sleep(1)
         await self.bot.change_presence(activity=discord.Activity(name="\U0001f440", type=discord.ActivityType.watching))
 
+    @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.id == 435017405220126720:
             return
@@ -123,7 +127,8 @@ class DoStuff:
             if message.sticker:
                 b = BytesIO()
                 await message.sticker.to_gif(b)
-                await exe(file=discord.File(b.getvalue(), f"sticker_{message.sticker.id}.gif"))
+                b.seek(0)
+                await exe(file=discord.File(b, f"sticker_{message.sticker.id}.gif"))
 
             if message.files:
                 content = []
@@ -231,7 +236,7 @@ class BridgetFB:
     async def wait_for_discord_messages(self):
         if not self.bot._ready.is_set():
             await self.bot._ready.wait()
-        thread = await self.bot._state.get_thread("1240696179284814")
+        thread = await self.bot._state.fetch_thread("1240696179284814")
 
         while True:
             message = await discord_messages.get()
@@ -254,7 +259,7 @@ class BridgetFB:
             if message.attachments:
                 sendable = True
                 for a in message.attachments:
-                    ctn.embed(a.url, append=False)
+                    ctn.embed_link(a.url, append=False)
 
             if sendable:
                 if message.author.id != self.last_author:
